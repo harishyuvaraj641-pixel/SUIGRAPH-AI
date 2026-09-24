@@ -1,0 +1,13 @@
+{
+  "name": "suigraph-twin",
+  "version": "0.1.0",
+  "description": "SuiGraph AI — 3D Pipeline Digital Twin",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {},
+  "dependencies": {}
+}

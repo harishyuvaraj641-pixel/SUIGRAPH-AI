@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SuiGraph AI — 3D Pipeline Digital Twin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+<style>
+/* ═══════════════════════════════════════════
+   SuiGraph AI — Industrial Digital Twin UI
+   Glassmorphism + Dark Industrial Theme
+   ═══════════════════════════════════════════ */
+
+:root {
+  --bg-dark: #060a12;
+  --bg-panel: rgba(8, 12, 24, 0.88);
+  --bg-glass: rgba(12, 18, 35, 0.72);
+  --border: rgba(0, 200, 255, 0.12);
+  --border-active: rgba(0, 200, 255, 0.35);
+  --cyan: #00d4ff;
+  --cyan-dim: rgba(0, 212, 255, 0.25);
+  --cyan-glow: rgba(0, 212, 255, 0.08);
+  --green: #00ff88;
+  --green-dim: rgba(0, 255, 136, 0.2);
+  --yellow: #ffaa00;
+  --red: #ff3344;
+  --red-dim: rgba(255, 51, 68, 0.15);
+  --orange: #ff6622;
+  --text-primary: #e0e8f0;
+  --text-secondary: rgba(200, 215, 230, 0.55);
+  --text-label: rgba(0, 200, 255, 0.7);
+  --font-mono: 'Share Tech Mono', 'Courier New', monospace;
+  --font-display: 'Orbitron', sans-serif;
+  --font-ui: 'Inter', -apple-system, sans-serif;
+  --blur: 22px;
+  --radius: 8px;
+  --radius-lg: 14px;
+  --transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  width: 100%; height: 100%;
+  overflow: hidden;
+  background: var(--bg-dark);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+}
+
+/* ── Canvas Container ────────────────────── */
+#canvas-container {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+}
+#canvas-container canvas { display: block; }
+
+/* ── Glass Panel Base ────────────────────── */
+.glass {
+  background: var(--bg-glass);
+  backdrop-filter: blur(var(--blur));
+  -webkit-backdrop-filter: blur(var(--blur));
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255,255,255,0.03);
+}
+.glass-solid {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+}
+
+/* ── Typography ──────────────────────────── */
+.label { font-family: var(--font-mono); font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--text-label); }
+.value { font-family: var(--font-mono); font-size: 14px; color: var(--text-primary); }
+.value-lg { font-family: var(--font-display); font-size: 22px; font-weight: 700; }
+.value-xl { font-family: var(--font-display); font-size: 32px; font-weight: 900; }
+.mono { font-family: var(--font-mono); }
+
+.status-dot {
+  display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+  margin-right: 6px; vertical-align: middle;
+}
+.status-dot.online { background: var(--green); box-shadow: 0 0 8px var(--green); }
+.status-dot.warning { background: var(--yellow); box-shadow: 0 0 8px var(--yellow); }
+.status-dot.critical { background: var(--red); box-shadow: 0 0 8px var(--red); animation: pulse-dot 0.6s ease-in-out infinite alternate; }
+
+@keyframes pulse-dot { to { opacity: 0.4; transform: scale(0.7); } }
+
+/* ── Top Bar ─────────────────────────────── */
+#top-bar {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 24px; height: 56px;
+  background: linear-gradient(180deg, rgba(6,10,18,0.95) 0%, rgba(6,10,18,0.7) 100%);
+  border-bottom: 1px solid var(--border);
+}
+#top-bar .brand {
+  display: flex; align-items: center; gap: 12px;
+}
+#top-bar .brand h1 {
+  font-family: var(--font-display); font-size: 18px; font-weight: 700;
+  color: var(--cyan); letter-spacing: 3px;
+}
+#top-bar .brand .subtitle {
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: 2px;
+  color: var(--text-secondary); text-transform: uppercase;
+  border-left: 1px solid var(--border); padding-left: 12px;
+}
+#top-bar .status-group {
+  display: flex; align-items: center; gap: 20px;
+}
+.stat-item {
+  text-align: right;
+}
+.stat-item .label { display: block; margin-bottom: 2px; font-size: 9px; }
+.stat-item .value { font-size: 13px; }
+
+/* ── Control Buttons (Left Side) ─────────── */
+#controls {
+  position: fixed; left: 16px; top: 50%; transform: translateY(-50%);
+  z-index: 100; display: flex; flex-direction: column; gap: 6px;
+}
+.ctrl-btn {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 14px; min-width: 160px;
+  background: var(--bg-panel); border: 1px solid var(--border);
+  border-radius: var(--radius); color: var(--text-primary);
+  font-family: var(--font-mono); font-size: 11px; letter-spacing: 1px;
+  text-transform: uppercase; cursor: pointer;
+  transition: var(--transition); white-space: nowrap;
+}
+.ctrl-btn:hover {
+  background: rgba(0, 200, 255, 0.08); border-color: var(--border-active);
+  box-shadow: 0 0 15px var(--cyan-glow);
+}
+.ctrl-btn.active {
+  background: rgba(0, 200, 255, 0.12); border-color: var(--cyan);
+  color: var(--cyan);
+}
+.ctrl-btn.primary {
+  background: rgba(0, 200, 255, 0.1); border-color: var(--cyan);
+  color: var(--cyan);
+}
+.ctrl-btn.danger {
+  border-color: rgba(255, 51, 68, 0.3);
+}
+.ctrl-btn.danger:hover {
+  background: var(--red-dim); border-color: var(--red);
+}
+.ctrl-icon { font-size: 14px; width: 18px; text-align: center; }
+
+/* ── AI Engine Panel (Bottom Left) ───────── */
+#ai-panel {
+  position: fixed; bottom: 16px; left: 16px; z-index: 100;
+  width: 240px; padding: 16px;
+}
+#ai-panel .panel-title {
+  font-family: var(--font-display); font-size: 11px; letter-spacing: 2px;
+  color: var(--cyan); margin-bottom: 12px;
+  padding-bottom: 8px; border-bottom: 1px solid var(--border);
+}
+.ai-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 4px 0; font-size: 11px;
+}
+.ai-row .label { color: var(--text-secondary); font-family: var(--font-mono); font-size: 10px; letter-spacing: 1px; }
+.ai-row .value { font-family: var(--font-mono); font-size: 12px; }
+
+/* ── Leak Alert Panel (Bottom Right) ─────── */
+#leak-panel {
+  position: fixed; bottom: 16px; right: 16px; z-index: 100;
+  width: 260px; padding: 16px;
+  border-color: transparent;
+  transition: var(--transition);
+  opacity: 0; pointer-events: none; transform: translateY(10px);
+}
+#leak-panel.visible {
+  opacity: 1; pointer-events: auto; transform: translateY(0);
+  border-color: rgba(255, 51, 68, 0.4);
+  box-shadow: 0 0 30px rgba(255, 51, 68, 0.08);
+}
+#leak-panel .panel-title {
+  font-family: var(--font-display); font-size: 12px; letter-spacing: 2px;
+  color: var(--red); margin-bottom: 10px;
+  display: flex; align-items: center; gap: 8px;
+}
+#leak-panel .panel-title::before {
+  content: ''; display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+  background: var(--red); animation: pulse-dot 0.5s ease-in-out infinite alternate;
+}
+.leak-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 5px 0; font-size: 11px; border-bottom: 1px solid rgba(255,255,255,0.03);
+}
+.leak-row:last-child { border-bottom: none; }
+.leak-row .label { color: var(--text-secondary); font-family: var(--font-mono); font-size: 10px; letter-spacing: 1px; }
+.leak-row .value { font-family: var(--font-mono); font-size: 13px; font-weight: 600; }
+.leak-row .value.critical { color: var(--red); }
+.leak-row .value.warning { color: var(--yellow); }
+
+/* ── Detail Panel (Right Side) ───────────── */
+#detail-panel {
+  position: fixed; top: 72px; right: 16px; z-index: 100;
+  width: 280px; max-height: calc(100vh - 180px);
+  padding: 20px; overflow-y: auto;
+  transform: translateX(320px); opacity: 0;
+  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
+}
+#detail-panel.open {
+  transform: translateX(0); opacity: 1;
+}
+#detail-panel .panel-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 16px; padding-bottom: 10px; border-bottom: 1px solid var(--border);
+}
+#detail-panel .panel-header h3 {
+  font-family: var(--font-display); font-size: 13px; letter-spacing: 2px; color: var(--cyan);
+}
+#detail-panel .close-btn {
+  background: none; border: 1px solid var(--border); color: var(--text-secondary);
+  width: 28px; height: 28px; border-radius: 50%; cursor: pointer;
+  font-size: 14px; display: flex; align-items: center; justify-content: center;
+  transition: var(--transition);
+}
+#detail-panel .close-btn:hover { border-color: var(--red); color: var(--red); }
+.detail-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.03);
+}
+.detail-row .label { font-family: var(--font-mono); font-size: 10px; letter-spacing: 1.5px; color: var(--text-label); text-transform: uppercase; }
+.detail-row .value { font-family: var(--font-mono); font-size: 13px; text-align: right; }
+.detail-id { font-family: var(--font-display); font-size: 20px; font-weight: 700; color: var(--cyan); margin-bottom: 4px; }
+.detail-type { font-family: var(--font-mono); font-size: 10px; color: var(--text-secondary); letter-spacing: 2px; text-transform: uppercase; }
+
+/* ── Mini Chart ──────────────────────────── */
+#mini-chart {
+  width: 100%; height: 80px; margin-top: 12px;
+  background: rgba(0,0,0,0.3); border-radius: 6px; border: 1px solid var(--border);
+  overflow: hidden; position: relative;
+}
+#mini-chart canvas { width: 100% !important; height: 100% !important; }
+
+/* ── Tooltip ─────────────────────────────── */
+#tooltip {
+  position: fixed; z-index: 200;
+  padding: 10px 14px; pointer-events: none;
+  font-family: var(--font-mono); font-size: 11px;
+  opacity: 0; transition: opacity 0.15s ease;
+  max-width: 220px;
+  background: rgba(6, 10, 18, 0.95);
+  border: 1px solid var(--border-active);
+  border-radius: 6px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+}
+#tooltip.visible { opacity: 1; }
+#tooltip .tt-title { color: var(--cyan); font-size: 12px; font-weight: 600; margin-bottom: 6px; letter-spacing: 1px; }
+#tooltip .tt-row { display: flex; justify-content: space-between; gap: 16px; padding: 2px 0; }
+#tooltip .tt-label { color: var(--text-secondary); font-size: 10px; text-transform: uppercase; letter-spacing: 1px; }
+#tooltip .tt-value { color: var(--text-primary); font-size: 11px; }
+
+/* ── Demo Overlay ────────────────────────── */
+#demo-overlay {
+  position: fixed; inset: 0; z-index: 150;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  pointer-events: none; opacity: 0; transition: opacity 0.5s ease;
+}
+#demo-overlay.visible { opacity: 1; }
+#demo-overlay .demo-text {
+  font-family: var(--font-display); font-size: 28px; font-weight: 700;
+  color: var(--cyan); text-align: center; letter-spacing: 4px;
+  text-shadow: 0 0 40px rgba(0, 212, 255, 0.3);
+  opacity: 0; transform: translateY(20px);
+}
+#demo-overlay .demo-subtext {
+  font-family: var(--font-mono); font-size: 13px;
+  color: var(--text-secondary); text-align: center; letter-spacing: 2px;
+  margin-top: 8px; opacity: 0;
+}
+
+/* ── Work Order Modal ────────────────────── */
+#work-order-modal {
+  position: fixed; inset: 0; z-index: 300;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  opacity: 0; pointer-events: none; transition: opacity 0.3s ease;
+}
+#work-order-modal.visible { opacity: 1; pointer-events: auto; }
+#work-order-modal .modal-content {
+  width: 400px; padding: 28px;
+  background: var(--bg-panel); border: 1px solid var(--border-active);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6), 0 0 40px var(--cyan-glow);
+}
+.modal-content .modal-title {
+  font-family: var(--font-display); font-size: 16px; font-weight: 700;
+  color: var(--cyan); letter-spacing: 3px; text-align: center;
+  margin-bottom: 20px; padding-bottom: 14px; border-bottom: 1px solid var(--border);
+}
+.wo-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.03);
+}
+.wo-row .label { font-family: var(--font-mono); font-size: 10px; letter-spacing: 1.5px; color: var(--text-label); text-transform: uppercase; }
+.wo-row .value { font-family: var(--font-mono); font-size: 13px; }
+.wo-row .value.critical { color: var(--red); font-weight: 700; }
+.wo-dispatch {
+  margin-top: 16px; padding: 12px; text-align: center;
+  background: rgba(0, 255, 136, 0.06); border: 1px solid rgba(0, 255, 136, 0.2);
+  border-radius: var(--radius); font-family: var(--font-mono); font-size: 12px;
+  color: var(--green); letter-spacing: 1.5px;
+}
+.modal-close {
+  display: block; margin: 16px auto 0; padding: 8px 24px;
+  background: none; border: 1px solid var(--border); border-radius: var(--radius);
+  color: var(--text-secondary); font-family: var(--font-mono); font-size: 11px;
+  letter-spacing: 1px; cursor: pointer; transition: var(--transition);
+}
+.modal-close:hover { border-color: var(--cyan); color: var(--cyan); }
+
+/* ── Sync Indicator ──────────────────────── */
+#sync-indicator {
+  position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
+  z-index: 100; padding: 6px 16px;
+  display: flex; align-items: center; gap: 8px;
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: 1.5px;
+  color: var(--text-secondary);
+}
+.sync-pulse {
+  width: 6px; height: 6px; border-radius: 50%; background: var(--green);
+  animation: sync-blink 2s ease-in-out infinite;
+}
+@keyframes sync-blink {
+  0%, 100% { opacity: 1; } 50% { opacity: 0.3; }
+}
+
+/* ── Loading Screen ──────────────────────── */
+#loading {
+  position: fixed; inset: 0; z-index: 999;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  background: var(--bg-dark);
+  transition: opacity 0.8s ease;
+}
+#loading.hidden { opacity: 0; pointer-events: none; }
+#loading h1 { font-family: var(--font-display); font-size: 28px; color: var(--cyan); letter-spacing: 5px; margin-bottom: 8px; }
+#loading p { font-family: var(--font-mono); font-size: 11px; color: var(--text-secondary); letter-spacing: 2px; }
+.loader-bar {
+  width: 200px; height: 2px; background: rgba(255,255,255,0.05);
+  margin-top: 24px; border-radius: 2px; overflow: hidden;
+}
+.loader-bar::after {
+  content: ''; display: block; width: 40%; height: 100%;
+  background: var(--cyan); border-radius: 2px;
+  animation: load-slide 1.2s ease-in-out infinite;
+}
+@keyframes load-slide {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(350%); }
+}
+
+/* ── Scrollbar ───────────────────────────── */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--cyan-dim); border-radius: 4px; }
+
+/* ── Responsive ──────────────────────────── */
+@media (max-width: 1400px) {
+  #controls { left: 8px; }
+  .ctrl-btn { min-width: 140px; padding: 8px 10px; font-size: 10px; }
+  #ai-panel { width: 210px; padding: 12px; }
+  #leak-panel { width: 230px; padding: 12px; }
+  #detail-panel { width: 250px; }
+}
+@media (max-width: 1100px) {
+  .ctrl-btn span.btn-text { display: none; }
+  .ctrl-btn { min-width: auto; padding: 10px; }
+  #controls { gap: 4px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ═══ Loading Screen ═══ -->
+<div id="loading">
+  <h1>SUIGRAPH AI</h1>
+  <p>INITIALIZING 3D DIGITAL TWIN</p>
+  <div class="loader-bar"></div>
+</div>
+
+<!-- ═══ Three.js Canvas ═══ -->
+<div id="canvas-container"></div>
+
+<!-- ═══ Top Bar ═══ -->
+<div id="top-bar">
+  <div class="brand">
+    <h1>SUIGRAPH AI</h1>
+    <span class="subtitle">LIVE DIGITAL TWIN</span>
+  </div>
+  <div class="status-group">
+    <div class="stat-item">
+      <span class="label">SYSTEM</span>
+      <span class="value" id="sys-status"><span class="status-dot online"></span>ONLINE</span>
+    </div>
+    <div class="stat-item">
+      <span class="label">NETWORK HEALTH</span>
+      <span class="value" id="net-health" style="color:var(--green)">100%</span>
+    </div>
+    <div class="stat-item">
+      <span class="label">SENSORS</span>
+      <span class="value" id="sensor-count">12</span>
+    </div>
+    <div class="stat-item">
+      <span class="label">ANOMALIES</span>
+      <span class="value" id="anomaly-count" style="color:var(--green)">00</span>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ Control Buttons ═══ -->
+<div id="controls">
+  <button class="ctrl-btn active" data-action="monitor"><span class="ctrl-icon">◉</span><span class="btn-text">LIVE MONITOR</span></button>
+  <button class="ctrl-btn primary" data-action="demo"><span class="ctrl-icon">▶</span><span class="btn-text">START AI DEMO</span></button>
+  <button class="ctrl-btn" data-action="graph"><span class="ctrl-icon">⬡</span><span class="btn-text">GRAPH ANALYSIS</span></button>
+  <button class="ctrl-btn" data-action="sensors"><span class="ctrl-icon">◈</span><span class="btn-text">SENSOR DATA</span></button>
+  <button class="ctrl-btn danger" data-action="leak"><span class="ctrl-icon">⚠</span><span class="btn-text">LEAK LOCATION</span></button>
+  <button class="ctrl-btn" data-action="workorder"><span class="ctrl-icon">📋</span><span class="btn-text">WORK ORDER</span></button>
+  <button class="ctrl-btn" data-action="reset"><span class="ctrl-icon">↺</span><span class="btn-text">RESET</span></button>
+</div>
+
+<!-- ═══ AI Engine Panel ═══ -->
+<div id="ai-panel" class="glass">
+  <div class="panel-title">AI ENGINE</div>
+  <div class="ai-row"><span class="label">MODEL</span><span class="value" id="ai-model">LSTM / TRANSFORMER</span></div>
+  <div class="ai-row"><span class="label">STATUS</span><span class="value" id="ai-status" style="color:var(--green)">MONITORING</span></div>
+  <div class="ai-row"><span class="label">ANOMALY SCORE</span><span class="value" id="ai-score">0.00</span></div>
+  <div class="ai-row"><span class="label">GNN</span><span class="value" id="ai-gnn">STANDBY</span></div>
+</div>
+
+<!-- ═══ Leak Alert Panel ═══ -->
+<div id="leak-panel" class="glass-solid">
+  <div class="panel-title">⚠ LEAK ALERT</div>
+  <div class="leak-row"><span class="label">PIPE</span><span class="value critical" id="leak-pipe">P-17</span></div>
+  <div class="leak-row"><span class="label">CONFIDENCE</span><span class="value critical" id="leak-conf">96.4%</span></div>
+  <div class="leak-row"><span class="label">LOSS</span><span class="value warning" id="leak-loss">142 L/min</span></div>
+  <div class="leak-row"><span class="label">STATUS</span><span class="value critical" id="leak-status">CRITICAL</span></div>
+</div>
+
+<!-- ═══ Detail Panel ═══ -->
+<div id="detail-panel" class="glass-solid">
+  <div class="panel-header">
+    <div>
+      <div class="detail-id" id="detail-id">—</div>
+      <div class="detail-type" id="detail-type">—</div>
+    </div>
+    <button class="close-btn" id="detail-close">✕</button>
+  </div>
+  <div id="detail-body">
+    <!-- Dynamically populated -->
+  </div>
+  <div id="mini-chart" style="display:none">
+    <canvas id="mini-chart-canvas"></canvas>
+  </div>
+</div>
+
+<!-- ═══ Tooltip ═══ -->
+<div id="tooltip">
+  <div class="tt-title" id="tt-title"></div>
+  <div id="tt-body"></div>
+</div>
+
+<!-- ═══ Demo Overlay ═══ -->
+<div id="demo-overlay">
+  <div class="demo-text" id="demo-text"></div>
+  <div class="demo-subtext" id="demo-subtext"></div>
+</div>
+
+<!-- ═══ Work Order Modal ═══ -->
+<div id="work-order-modal">
+  <div class="modal-content glass-solid">
+    <div class="modal-title">WORK ORDER CREATED</div>
+    <div class="wo-row"><span class="label">PIPE</span><span class="value critical">P-17</span></div>
+    <div class="wo-row"><span class="label">ZONE</span><span class="value">ZONE-02</span></div>
+    <div class="wo-row"><span class="label">ISSUE</span><span class="value critical">PIPELINE LEAK</span></div>
+    <div class="wo-row"><span class="label">CONFIDENCE</span><span class="value">96.4%</span></div>
+    <div class="wo-row"><span class="label">EST. LOSS</span><span class="value warning">142 L/min</span></div>
+    <div class="wo-row"><span class="label">PRIORITY</span><span class="value critical">CRITICAL</span></div>
+    <div class="wo-dispatch" id="wo-dispatch">
+      <span class="status-dot online"></span> FIELD CREW — DISPATCHING...
+    </div>
+    <button class="modal-close" id="wo-close">CLOSE</button>
+  </div>
+</div>
+
+<!-- ═══ Sync Indicator ═══ -->
+<div id="sync-indicator" class="glass">
+  <span class="sync-pulse"></span>
+  LIVE SYNC — CONNECTED — <span id="sync-time">00:00:00</span>
+</div>
+
+<!-- ═══ GSAP ═══ -->
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+
+<!-- ═══ Application Entry Point ═══ -->
+<script type="module" src="src/main.js"></script>
+
+</body>
+</html>
