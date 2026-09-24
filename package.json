@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "SuiGraph AI — 3D Pipeline Digital Twin",
   "scripts": {
-    "build": "echo 'Ready'",
+    "build": "node build.js",
     "start": "node local-server.js"
   },
   "author": "",
