@@ -25,6 +25,6 @@ if %errorlevel% neq 0 (
 start "" /min cmd /c "timeout /t 2 /nobreak >nul & start http://localhost:3000"
 
 :: Start the server
-node server.js
+node local-server.js
 
 pause

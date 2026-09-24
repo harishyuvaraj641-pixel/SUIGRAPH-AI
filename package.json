@@ -4,7 +4,7 @@
   "description": "SuiGraph AI — 3D Pipeline Digital Twin",
   "scripts": {
     "build": "echo 'Ready'",
-    "start": "node server.js"
+    "start": "node local-server.js"
   },
   "author": "",
   "license": "MIT",
